@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase, GitaVerse } from '../lib/supabase';
 import { Volume2, Heart, Search, BookOpen, Languages } from 'lucide-react';
 import { useSpeech } from '../hooks/useSpeech';
@@ -15,6 +15,8 @@ export default function GitaPage() {
   const [audioLanguage, setAudioLanguage] = useState<'en' | 'te'>('en');
   const [teluguExplanations, setTeluguExplanations] = useState<Record<string, string>>({});
   const [loadingExplanationId, setLoadingExplanationId] = useState<string | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [visibleCount, setVisibleCount] = useState(20);
 
   const { speak, isSpeaking } = useSpeech();
   const { toggleFavorite, isFavorite } = useFavorites();
@@ -42,33 +44,35 @@ export default function GitaPage() {
       setLoading(false);
     }
   };
+  // Debounce search input
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(searchQuery.trim().toLowerCase()), 220);
+    return () => clearTimeout(id);
+  }, [searchQuery]);
 
-  const filterVerses = useCallback(() => {
-    let filtered = verses;
-
+  // Compute filtered list
+  const filtered = useMemo(() => {
+    let list = verses;
     if (selectedChapter !== null) {
-      filtered = filtered.filter(v => v.chapter === selectedChapter);
+      list = list.filter((v) => v.chapter === selectedChapter);
     }
-
-    if (searchQuery.trim() !== '') {
-      const query = searchQuery.toLowerCase();
-
-      filtered = filtered.filter(v =>
-        (v.translation_en || '').toLowerCase().includes(query) ||
-        (v.translation_hi || '').toLowerCase().includes(query) ||
-        (v.translation_te || '').toLowerCase().includes(query) ||
-        (v.transliteration || '').toLowerCase().includes(query) ||
-        (v.sanskrit || '').toLowerCase().includes(query) ||
-        (v.commentary || '').toLowerCase().includes(query)
+    if (debouncedSearch) {
+      list = list.filter((v) =>
+        (v.translation_en || '').toLowerCase().includes(debouncedSearch) ||
+        (v.translation_hi || '').toLowerCase().includes(debouncedSearch) ||
+        (v.translation_te || '').toLowerCase().includes(debouncedSearch) ||
+        (v.transliteration || '').toLowerCase().includes(debouncedSearch) ||
+        (v.sanskrit || '').toLowerCase().includes(debouncedSearch) ||
+        (v.commentary || '').toLowerCase().includes(debouncedSearch)
       );
     }
-
-    setFilteredVerses(filtered);
-  }, [selectedChapter, searchQuery, verses]);
+    return list;
+  }, [verses, selectedChapter, debouncedSearch]);
 
   useEffect(() => {
-    filterVerses();
-  }, [filterVerses]);
+    setFilteredVerses(filtered);
+    setVisibleCount(20); // reset pagination when filters change
+  }, [filtered]);
 
   const ensureTeluguExplanation = useCallback(async (verse: GitaVerse) => {
     const verseId = String(verse.id);
@@ -136,6 +140,8 @@ export default function GitaPage() {
   }, [filteredVerses, ensureTeluguExplanation, teluguExplanations]);
 
   const chapters = Array.from({ length: 18 }, (_, i) => i + 1);
+  const visibleVerses = filteredVerses.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredVerses.length;
 
   if (loading) {
     return (
@@ -212,7 +218,7 @@ export default function GitaPage() {
           </div>
 
           {/* Chapter Filter */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 sticky top-4 z-10 bg-white/70 dark:bg-gray-800/70 backdrop-blur rounded-lg p-2">
             <button
               onClick={() => setSelectedChapter(null)}
               className={`px-4 py-2 rounded-lg ${
@@ -242,17 +248,17 @@ export default function GitaPage() {
 
         {/* Verses */}
         <div className="space-y-6">
-          {filteredVerses.map((verse) => (
+          {visibleVerses.map((verse) => (
             <div
               key={verse.id}
               className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-amber-100 dark:border-gray-700"
             >
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
+                  <span className="inline-flex items-center h-8 px-3 text-xs font-semibold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
                     Chapter {verse.chapter}
                   </span>
-                  <span className="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200">
+                  <span className="inline-flex items-center h-8 px-3 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200">
                     Verse {verse.verse}
                   </span>
                 </div>
@@ -360,6 +366,23 @@ export default function GitaPage() {
               </div>
             </div>
           ))}
+
+          {hasMore && (
+            <div className="flex justify-center pt-4">
+              <button
+                onClick={() => setVisibleCount((c) => c + 20)}
+                className="px-5 py-2 rounded-full bg-amber-600 text-white hover:bg-amber-700 transition"
+              >
+                Load more
+              </button>
+            </div>
+          )}
+
+          {filteredVerses.length === 0 && (
+            <div className="text-center text-gray-600 dark:text-gray-300 py-10">
+              No verses match your search yet. Try a different keyword or chapter.
+            </div>
+          )}
         </div>
 
       </div>

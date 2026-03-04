@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Bot, Loader2, Send, Sparkles, Trash2, User } from 'lucide-react';
 import { type AiContextMode } from '../utils/localAi';
 import { generateDialogflowReply } from '../utils/dialogflowAi';
+import { generateGeminiReply } from '../utils/geminiAi';
 
 interface ChatMessage {
   id: string;
@@ -81,18 +82,33 @@ export default function VoiceAssistant() {
     setLoading(true);
 
     try {
-      const reply = await generateDialogflowReply(question, {
+      const reply = await generateGeminiReply(question, {
         ultraBrief: ultraBriefMode,
         contextMode,
         conversationHistory: historyForAi,
       });
       setMessages((prev) => [...prev, createMessage('assistant', reply)]);
     } catch (error) {
-      const errorText = error instanceof Error ? error.message : 'Unknown local AI error.';
-      setMessages((prev) => [
-        ...prev,
-        createMessage('assistant', `I could not process that right now. ${errorText}`),
-      ]);
+      // Fallback to Dialogflow/local if Gemini fails
+      try {
+        const reply = await generateDialogflowReply(question, {
+          ultraBrief: ultraBriefMode,
+          contextMode,
+          conversationHistory: historyForAi,
+        });
+        setMessages((prev) => [...prev, createMessage('assistant', reply)]);
+      } catch (err) {
+        const errorText =
+          err instanceof Error
+            ? err.message
+            : error instanceof Error
+            ? error.message
+            : 'Unknown AI error.';
+        setMessages((prev) => [
+          ...prev,
+          createMessage('assistant', `I could not process that right now. ${errorText}`),
+        ]);
+      }
     } finally {
       setLoading(false);
     }

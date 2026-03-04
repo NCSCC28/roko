@@ -22,6 +22,66 @@ const greetingPatterns = ['hi', 'hello', 'hlo', 'hey', 'namaste'];
 const moodLiftPatterns = ['sad', 'anxious', 'motivate', 'motivation', 'low', 'depressed'];
 const verseReferenceRegex = /\d+\s*:\s*\d+/;
 const topicSearchRegex = /verses about\s+(.+)/i;
+const lifeSituations: Record<string, { keywords: string[]; response: string }> = {
+  career: {
+    keywords: ['career', 'job', 'work', 'confusion'],
+    response: formatLifeResponse({
+      title: 'Career confusion',
+      verse: '“karmanye vadhikaraste ma phaleshu kadachana” — You have a right to action, not its fruits. (Gita 2:47)',
+      parallel: '“Commit your work to the LORD, and your plans will be established.” (Proverbs 16:3)',
+      action: 'Write one thing you can do today that serves others; do it without worrying about outcomes.'
+    })
+  },
+  failure: {
+    keywords: ['failure', 'fail', 'fear of failure'],
+    response: formatLifeResponse({
+      title: 'Fear of failure',
+      verse: '“yogaḥ karmasu kauśalam” — Yoga is skill in action. (Gita 2:50)',
+      parallel: '“For God gave us a spirit not of fear but of power, love, and self-control.” (2 Tim 1:7)',
+      action: 'Pick a small, safe experiment and ship it in 24 hours.'
+    })
+  },
+  breakup: {
+    keywords: ['breakup', 'heartbreak'],
+    response: formatLifeResponse({
+      title: 'Breakup',
+      verse: '“This too shall pass; be steadfast in yoga.” (Gita 2:15 paraphrase)',
+      parallel: '“The LORD is close to the brokenhearted.” (Psalm 34:18)',
+      action: 'Call a trusted friend and share one feeling; then take a 20-minute walk.'
+    })
+  },
+  anger: {
+    keywords: ['anger', 'angry'],
+    response: formatLifeResponse({
+      title: 'Anger',
+      verse: '“From anger comes delusion; from delusion, loss of memory.” (Gita 2:63)',
+      parallel: '“Be slow to anger.” (James 1:19)',
+      action: 'Pause for 3 deep breaths, step away for 5 minutes, then write what you actually need.'
+    })
+  },
+  exam: {
+    keywords: ['exam', 'exam stress', 'study', 'test'],
+    response: formatLifeResponse({
+      title: 'Exam stress',
+      verse: '“Stand firm in your duty.” (Gita 3:19)',
+      parallel: '“Ask, and it will be given to you; seek, and you will find.” (Matthew 7:7)',
+      action: 'Do a 50-minute focused study block, then 10-minute break; repeat twice.'
+    })
+  },
+  family: {
+    keywords: ['family', 'conflict', 'parents', 'siblings'],
+    response: formatLifeResponse({
+      title: 'Family conflict',
+      verse: '“Speak words that are truthful, pleasant, and beneficial.” (Gita 17:15)',
+      parallel: '“Blessed are the peacemakers.” (Matthew 5:9)',
+      action: 'Schedule a calm 15-minute talk; start by stating what you appreciate before the issue.'
+    })
+  }
+};
+
+function formatLifeResponse(opts: { title: string; verse: string; parallel: string; action: string }): string {
+  return `${opts.title}\nVerse: ${opts.verse}\nAlso: ${opts.parallel}\nAction: ${opts.action}`;
+}
 
 function getMotivationalVerses(): string {
   return [
@@ -155,6 +215,14 @@ export async function matchIntent(input: string): Promise<IntentResult> {
       intent: 'topic_search',
       response: `Searching for verses about "${topic}".`
     };
+  }
+
+  // Step 4b: Life situations
+  for (const key of Object.keys(lifeSituations)) {
+    const { keywords, response } = lifeSituations[key];
+    if (keywords.some((k) => message.includes(k))) {
+      return { matched: true, intent: `life_${key}`, response };
+    }
   }
 
   // Legacy intents (search, music, weather, news, time, help, etc.)
